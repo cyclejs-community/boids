@@ -1,0 +1,18 @@
+import xs from 'xstream';
+
+function fromEvent (element, eventName) {
+  const event$ = xs.create();
+  element.addEventListener(eventName, ev => event$.shamefullySendNext(ev));
+  return event$;
+}
+
+export default function mousePositionDriver () {
+  return {
+    positions () {
+      return fromEvent(document, 'mousemove')
+        .map(ev => {
+          return {x: ev.clientX, y: ev.clientY};
+        }).startWith({x: 0, y: 0});
+    }
+  };
+}
