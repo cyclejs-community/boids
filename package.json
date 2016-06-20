@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "budo index.js:bundle.js -- -t babelify | garnish"
+    "start": "budo index.js:bundle.js -- -t babelify | garnish",
+    "bundle": "browserify index.js -o bundle.js -t babelify"
   },
   "repository": {
     "type": "git",
