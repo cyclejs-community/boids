@@ -15,13 +15,19 @@ import mousePositionDriver from './src/mouse-position-driver';
 //    X each boid moves towards the mouse
 //
 const FRAME_RATE = 1000 / 60;
+
 const AVOIDANCE_DISTANCE = 50;
 const BOID_COUNT = 100;
+const FRICTION = 0.98;
+const FLOCK_CENTRE_WEIGHT = 0.2;
+const MOUSE_POSITION_WEIGHT = 0.5;
+const AVOIDANCE_WEIGHT = -1.1;
 
 function Boid () {
   return {
     position: {x: 200, y: 200},
-    key: uuid.v4()
+    key: uuid.v4(),
+    velocity: {x: 0, y: 0}
   };
 }
 
@@ -30,9 +36,15 @@ function makeflock (count) {
 }
 
 function renderBoid (boid) {
+  const angle = Math.atan2(boid.velocity.y, boid.velocity.x);
+
+  const speed = Math.abs(boid.velocity.x) + Math.abs(boid.velocity.y)
+
+  const scale = speed / 30;
+
   const style = {
     position: 'absolute',
-    transform: `translate(${boid.position.x}px, ${boid.position.y}px)`
+    transform: `translate(${boid.position.x}px, ${boid.position.y}px) rotate(${angle}rad) scale(${scale})`
   };
 
   return (
@@ -56,7 +68,7 @@ function sign (number) {
   return 0;
 }
 
-function moveTowards(boid, delta, position, speed = 1) {
+function moveTowards(boid, delta, position, speed) {
   const distance = {
     x: position.x - boid.position.x,
     y: position.y - boid.position.y
@@ -69,8 +81,8 @@ function moveTowards(boid, delta, position, speed = 1) {
 
   const normalizedDistance = normalizeVector(absoluteDistance);
 
-  boid.position.x += normalizedDistance.x * sign(distance.x) * speed * delta;
-  boid.position.y += normalizedDistance.y * sign(distance.y) * speed * delta;
+  boid.velocity.x += normalizedDistance.x * sign(distance.x) * speed * delta;
+  boid.velocity.y += normalizedDistance.y * sign(distance.y) * speed * delta;
 }
 
 function normalizeVector (vector) {
@@ -108,15 +120,21 @@ function moveAwayFromCloseBoids (boid, flock, delta) {
     );
 
     if (distance < AVOIDANCE_DISTANCE) {
-      moveTowards(boid, delta, otherBoid.position, -0.9);
+      moveTowards(boid, delta, otherBoid.position, AVOIDANCE_WEIGHT);
     }
   });
 }
 
 function updateBoid (boid, delta, mousePosition, flockCentre, flock) {
-  moveTowards(boid, delta, mousePosition, 2);
-  moveTowards(boid, delta, flockCentre);
+  moveTowards(boid, delta, mousePosition, MOUSE_POSITION_WEIGHT);
+  moveTowards(boid, delta, flockCentre, FLOCK_CENTRE_WEIGHT);
   moveAwayFromCloseBoids(boid, flock, delta);
+
+  boid.position.x += boid.velocity.x * delta;
+  boid.position.y += boid.velocity.y * delta;
+
+  boid.velocity.x *= FRICTION / delta;
+  boid.velocity.y *= FRICTION / delta;
 
   return boid;
 }
