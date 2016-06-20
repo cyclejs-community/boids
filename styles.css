@@ -10,3 +10,16 @@ body {
   border-width: 12.5px 0 12.5px 30px;
   border-color: transparent transparent transparent #9900ff;
 }
+
+.controls {
+  position: absolute;
+  bottom: 20px;
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+}
+
+.control {
+  width: 15%;
+  opacity: 0.6;
+}
