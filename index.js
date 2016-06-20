@@ -4,6 +4,8 @@ import xs from 'xstream';
 import _ from 'lodash';
 import uuid from 'node-uuid';
 
+import timeDriver from './src/time-driver';
+
 // given we have a whole bunch of boids
 // every frame
 //  apply these rules:
@@ -22,10 +24,6 @@ function makeBoids (count) {
   return _.range(count).map(Boid);
 }
 
-const initialState = {
-  boids: makeBoids(10)
-};
-
 function renderBoid (boid) {
   const style = {
     position: 'absolute',
@@ -43,8 +41,18 @@ function view (state) {
   );
 }
 
-function main ({DOM}) {
-  const state$ = xs.of(initialState);
+function update (state, delta) {
+  return state;
+}
+
+function main ({DOM, Time}) {
+  const initialState = {
+    boids: makeBoids(10)
+  };
+
+  const tick$ = Time.map(time => time.delta);
+
+  const state$ = tick$.fold((state, delta) => update(state, delta), initialState);
 
   return {
     DOM: state$.map(view)
@@ -52,7 +60,8 @@ function main ({DOM}) {
 }
 
 const drivers = {
-  DOM: makeDOMDriver('.app')
+  DOM: makeDOMDriver('.app'),
+  Time: timeDriver
 };
 
 run(main, drivers);
