@@ -27,39 +27,29 @@ var _mousePositionDriver2 = _interopRequireDefault(_mousePositionDriver);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-// given we have a whole bunch of flock
-// every frame
-//  apply these rules:
-//    X each boid moves away from any boids in the flock that are too close
-//    X each boid moves towards the centre of the flock
-//    X each boid moves towards the mouse
-//
-//
-//  bonus:
-//    - deploy
-//    - start mouse in center
-//    - sliders
-//    - colors
-//      - more colourful closer to mouse
-//      - random hue
-//
-//    - min/max speed
-//    - glow
-//    - add/remove boid button
 var FRAME_RATE = 1000 / 60;
 
-var AVOIDANCE_DISTANCE = 50;
-var BOID_COUNT = 100;
+// subtract by 1 because otherwise the spawn point is the same as the mouse start
+// position and the boids don't move until the mouse moves
+var BOID_SPAWN_POINT = {
+  x: window.innerWidth / 2 - 1,
+  y: window.innerHeight / 2 - 1
+};
+
+var LIGHTNESS_MIN = 30;
+var LIGHTNESS_MAX = 100;
+var LIGHTNESS_RANGE = LIGHTNESS_MAX - LIGHTNESS_MIN;
+var LIGHTNESS_FALLOFF = 800;
+
+var BOID_COUNT = 75;
 var FRICTION = 0.98;
-var FLOCK_CENTRE_WEIGHT = 0.2;
-var MOUSE_POSITION_WEIGHT = 0.5;
-var AVOIDANCE_WEIGHT = -1.1;
 
 function Boid() {
   return {
-    position: { x: 200, y: 200 },
-    key: _nodeUuid2.default.v4(),
-    velocity: { x: 0, y: 0 }
+    position: Object.assign({}, BOID_SPAWN_POINT),
+    velocity: { x: 0, y: 0 },
+    hue: 276,
+    key: _nodeUuid2.default.v4()
   };
 }
 
@@ -67,23 +57,42 @@ function makeflock(count) {
   return _lodash2.default.range(count).map(Boid);
 }
 
-function renderBoid(boid) {
+function renderBoid(boid, mousePosition) {
   var angle = Math.atan2(boid.velocity.y, boid.velocity.x);
 
   var speed = Math.abs(boid.velocity.x) + Math.abs(boid.velocity.y);
 
   var scale = speed / 30;
 
+  var distanceVector = {
+    x: Math.abs(boid.position.x - mousePosition.x),
+    y: Math.abs(boid.position.y - mousePosition.y)
+  };
+
+  var distanceToMouse = Math.sqrt(Math.pow(distanceVector.x, 2) + Math.pow(distanceVector.y, 2));
+
+  var lightness = LIGHTNESS_MIN + LIGHTNESS_RANGE * distanceToMouse / LIGHTNESS_FALLOFF;
+
   var style = {
     position: 'absolute',
-    transform: 'translate(' + boid.position.x + 'px, ' + boid.position.y + 'px) rotate(' + angle + 'rad) scale(' + scale + ')'
+    transform: 'translate(' + boid.position.x + 'px, ' + boid.position.y + 'px) rotate(' + angle + 'rad) scale(' + scale + ')',
+    'border-color': 'transparent transparent transparent hsl(' + boid.hue + ', 100%, ' + lightness + '%)'
   };
 
   return (0, _dom.div)('.boid', { key: boid.key, style: style });
 }
 
 function view(state) {
-  return (0, _dom.div)('.flock', state.flock.map(renderBoid));
+  var slider = function slider(className, _ref) {
+    var value = _ref.value;
+    var min = _ref.min;
+    var max = _ref.max;
+    return (0, _dom.input)('.control ' + className, { attrs: { type: 'range', value: value, min: min, max: max } });
+  };
+
+  return (0, _dom.div)('.flock', [(0, _dom.div)('.controls', [slider('.avoidance', state.weights.avoidance), slider('.avoidance-distance', state.weights.avoidanceDistance), slider('.mouse-position', state.weights.mousePosition), slider('.flock-centre', state.weights.flockCentre)]), (0, _dom.div)('.boids', state.flock.map(function (boid) {
+    return renderBoid(boid, state.mousePosition);
+  }))]);
 }
 
 function sign(number) {
@@ -133,7 +142,7 @@ function calculateFlockCentre(flock) {
   };
 }
 
-function moveAwayFromCloseBoids(boid, flock, delta) {
+function moveAwayFromCloseBoids(boid, flock, avoidance, avoidanceDistance, delta) {
   flock.forEach(function (otherBoid) {
     if (boid === otherBoid) {
       return;
@@ -146,16 +155,28 @@ function moveAwayFromCloseBoids(boid, flock, delta) {
 
     var distance = Math.sqrt(Math.pow(distanceVector.x, 2) + Math.pow(distanceVector.y, 2));
 
-    if (distance < AVOIDANCE_DISTANCE) {
-      moveTowards(boid, delta, otherBoid.position, AVOIDANCE_WEIGHT);
+    if (distance < avoidanceDistance) {
+      moveTowards(boid, delta, otherBoid.position, -avoidance);
     }
   });
 }
 
-function updateBoid(boid, delta, mousePosition, flockCentre, flock) {
-  moveTowards(boid, delta, mousePosition, MOUSE_POSITION_WEIGHT);
-  moveTowards(boid, delta, flockCentre, FLOCK_CENTRE_WEIGHT);
-  moveAwayFromCloseBoids(boid, flock, delta);
+function makeWeightUpdateReducer$(weightPropertyName, weight$) {
+  return weight$.map(function (weight) {
+    return function (state) {
+      state.weights[weightPropertyName].value = weight;
+
+      return state;
+    };
+  });
+}
+
+function updateBoid(boid, delta, mousePosition, flockCentre, flock, weights) {
+  moveTowards(boid, delta, mousePosition, weights.mousePosition.value / 100);
+
+  moveTowards(boid, delta, flockCentre, weights.flockCentre.value / 100);
+
+  moveAwayFromCloseBoids(boid, flock, weights.avoidance.value / 100, weights.avoidanceDistance.value, delta);
 
   boid.position.x += boid.velocity.x * delta;
   boid.position.y += boid.velocity.y * delta;
@@ -167,23 +188,54 @@ function updateBoid(boid, delta, mousePosition, flockCentre, flock) {
 }
 
 function update(state, delta, mousePosition) {
+  state.mousePosition = mousePosition;
+
   var flockCentre = calculateFlockCentre(state.flock);
 
   state.flock.forEach(function (boid) {
-    return updateBoid(boid, delta, mousePosition, flockCentre, state.flock);
+    return updateBoid(boid, delta, mousePosition, flockCentre, state.flock, state.weights);
   });
 
   return state;
 }
 
-function main(_ref) {
-  var DOM = _ref.DOM;
-  var Time = _ref.Time;
-  var Mouse = _ref.Mouse;
+function main(_ref2) {
+  var DOM = _ref2.DOM;
+  var Time = _ref2.Time;
+  var Mouse = _ref2.Mouse;
 
   var initialState = {
-    flock: makeflock(BOID_COUNT)
+    flock: makeflock(BOID_COUNT),
+    mousePosition: { x: 0, y: 0 },
+
+    weights: {
+      avoidance: { value: 110, min: 50, max: 150 },
+      avoidanceDistance: { value: 50, min: 10, max: 100 },
+      flockCentre: { value: 20, min: 5, max: 50 },
+      mousePosition: { value: 50, min: 10, max: 100 }
+    }
   };
+
+  var avoidanceSlider$ = DOM.select('.avoidance').events('input').map(function (ev) {
+    return ev.target.value;
+  });
+
+  var avoidanceDistanceSlider$ = DOM.select('.avoidance-distance').events('input').map(function (ev) {
+    return ev.target.value;
+  });
+
+  var mousePositionSlider$ = DOM.select('.mouse-position').events('input').map(function (ev) {
+    return ev.target.value;
+  });
+
+  var flockCentreSlider$ = DOM.select('.flock-centre').events('input').map(function (ev) {
+    return ev.target.value;
+  });
+
+  var updateAvoidanceWeight$ = makeWeightUpdateReducer$('avoidance', avoidanceSlider$);
+  var updateAvoidanceDistanceWeight$ = makeWeightUpdateReducer$('avoidanceDistance', avoidanceDistanceSlider$);
+  var updateMousePositionWeight$ = makeWeightUpdateReducer$('mousePosition', mousePositionSlider$);
+  var updateFlockCentreWeight$ = makeWeightUpdateReducer$('flockCentre', flockCentreSlider$);
 
   var tick$ = Time.map(function (time) {
     return time.delta / FRAME_RATE;
@@ -197,7 +249,9 @@ function main(_ref) {
     });
   }).flatten();
 
-  var state$ = update$.fold(function (state, reducer) {
+  var reducer$ = _xstream2.default.merge(update$, updateAvoidanceWeight$, updateAvoidanceDistanceWeight$, updateMousePositionWeight$, updateFlockCentreWeight$);
+
+  var state$ = reducer$.fold(function (state, reducer) {
     return reducer(state);
   }, initialState);
 
@@ -44446,7 +44500,7 @@ function mousePositionDriver() {
     positions: function positions() {
       return fromEvent(document, 'mousemove').map(function (ev) {
         return { x: ev.clientX, y: ev.clientY };
-      }).startWith({ x: 0, y: 0 });
+      }).startWith({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
     }
   };
 }

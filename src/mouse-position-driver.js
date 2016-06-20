@@ -12,7 +12,7 @@ export default function mousePositionDriver () {
       return fromEvent(document, 'mousemove')
         .map(ev => {
           return {x: ev.clientX, y: ev.clientY};
-        }).startWith({x: 0, y: 0});
+        }).startWith({x: window.innerWidth / 2, y: window.innerHeight / 2});
     }
   };
 }
