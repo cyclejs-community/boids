@@ -10,11 +10,13 @@ import mousePositionDriver from './src/mouse-position-driver';
 // given we have a whole bunch of flock
 // every frame
 //  apply these rules:
-//    - each boid moves away from any flock that are too close
+//    X each boid moves away from any boids in the flock that are too close
 //    X each boid moves towards the centre of the flock
 //    X each boid moves towards the mouse
 //
 const FRAME_RATE = 1000 / 60;
+const AVOIDANCE_DISTANCE = 50;
+const BOID_COUNT = 100;
 
 function Boid () {
   return {
@@ -74,6 +76,10 @@ function moveTowards(boid, delta, position, speed = 1) {
 function normalizeVector (vector) {
   const vectorLength = Math.abs(vector.x + vector.y);
 
+  if (vectorLength === 0) {
+    return {x: 0, y: 0};
+  }
+
   return {
     x: vector.x / vectorLength,
     y: vector.y / vectorLength
@@ -87,9 +93,30 @@ function calculateFlockCentre (flock) {
   };
 }
 
-function updateBoid (boid, delta, mousePosition, flockCentre) {
+function moveAwayFromCloseBoids (boid, flock, delta) {
+  flock.forEach(otherBoid => {
+    if (boid === otherBoid) { return; }
+
+    const distanceVector = {
+      x: Math.abs(boid.position.x - otherBoid.position.x),
+      y: Math.abs(boid.position.y - otherBoid.position.y)
+    };
+
+    const distance = Math.sqrt(
+      Math.pow(distanceVector.x, 2) +
+      Math.pow(distanceVector.y, 2)
+    );
+
+    if (distance < AVOIDANCE_DISTANCE) {
+      moveTowards(boid, delta, otherBoid.position, -0.9);
+    }
+  });
+}
+
+function updateBoid (boid, delta, mousePosition, flockCentre, flock) {
   moveTowards(boid, delta, mousePosition, 2);
   moveTowards(boid, delta, flockCentre);
+  moveAwayFromCloseBoids(boid, flock, delta);
 
   return boid;
 }
@@ -97,14 +124,20 @@ function updateBoid (boid, delta, mousePosition, flockCentre) {
 function update (state, delta, mousePosition) {
   const flockCentre = calculateFlockCentre(state.flock);
 
-  state.flock.forEach(boid => updateBoid(boid, delta, mousePosition, flockCentre));
+  state.flock.forEach(boid => updateBoid(
+    boid,
+    delta,
+    mousePosition,
+    flockCentre,
+    state.flock
+  ));
 
   return state;
 }
 
 function main ({DOM, Time, Mouse}) {
   const initialState = {
-    flock: makeflock(10)
+    flock: makeflock(BOID_COUNT)
   };
 
   const tick$ = Time.map(time => time.delta / FRAME_RATE);
