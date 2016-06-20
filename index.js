@@ -16,17 +16,24 @@ import mousePositionDriver from './src/mouse-position-driver';
 //
 //
 //  bonus:
-//    - deploy
-//    - start mouse in center
+//    X deploy
+//    X start mouse in center
 //    - sliders
-//    - colors
-//      - more colourful closer to mouse
-//      - random hue
+//    X colors
+//      X more colourful closer to mouse
 //
 //    - min/max speed
 //    - glow
 //    - add/remove boid button
 const FRAME_RATE = 1000 / 60;
+
+// subtract by 1 because otherwise the spawn point is the same as the mouse start
+// position and the boids don't move until the mouse moves
+const BOID_SPAWN_POINT = {x: window.innerWidth / 2 - 1, y: window.innerHeight / 2 - 1}
+const LIGHTNESS_MIN = 30;
+const LIGHTNESS_MAX = 100;
+const LIGHTNESS_RANGE = LIGHTNESS_MAX - LIGHTNESS_MIN;
+const LIGHTNESS_FALLOFF = 800;
 
 const AVOIDANCE_DISTANCE = 50;
 const BOID_COUNT = 100;
@@ -37,9 +44,10 @@ const AVOIDANCE_WEIGHT = -1.1;
 
 function Boid () {
   return {
-    position: {x: 200, y: 200},
-    key: uuid.v4(),
-    velocity: {x: 0, y: 0}
+    position: Object.assign({}, BOID_SPAWN_POINT),
+    velocity: {x: 0, y: 0},
+    hue: 276,
+    key: uuid.v4()
   };
 }
 
@@ -47,16 +55,29 @@ function makeflock (count) {
   return _.range(count).map(Boid);
 }
 
-function renderBoid (boid) {
+function renderBoid (boid, mousePosition) {
   const angle = Math.atan2(boid.velocity.y, boid.velocity.x);
 
-  const speed = Math.abs(boid.velocity.x) + Math.abs(boid.velocity.y)
+  const speed = Math.abs(boid.velocity.x) + Math.abs(boid.velocity.y);
 
   const scale = speed / 30;
 
+  const distanceVector = {
+    x: Math.abs(boid.position.x - mousePosition.x),
+    y: Math.abs(boid.position.y - mousePosition.y)
+  };
+
+  const distanceToMouse = Math.sqrt(
+    Math.pow(distanceVector.x, 2) +
+    Math.pow(distanceVector.y, 2)
+  );
+
+  const lightness = LIGHTNESS_MIN + LIGHTNESS_RANGE * distanceToMouse / LIGHTNESS_FALLOFF;
+
   const style = {
     position: 'absolute',
-    transform: `translate(${boid.position.x}px, ${boid.position.y}px) rotate(${angle}rad) scale(${scale})`
+    transform: `translate(${boid.position.x}px, ${boid.position.y}px) rotate(${angle}rad) scale(${scale})`,
+    'border-color': `transparent transparent transparent hsl(${boid.hue}, 100%, ${lightness}%)`
   };
 
   return (
@@ -66,7 +87,7 @@ function renderBoid (boid) {
 
 function view (state) {
   return (
-    div('.flock', state.flock.map(renderBoid))
+    div('.flock', state.flock.map(boid => renderBoid(boid, state.mousePosition)))
   );
 }
 
@@ -80,7 +101,7 @@ function sign (number) {
   return 0;
 }
 
-function moveTowards(boid, delta, position, speed) {
+function moveTowards (boid, delta, position, speed) {
   const distance = {
     x: position.x - boid.position.x,
     y: position.y - boid.position.y
@@ -152,6 +173,8 @@ function updateBoid (boid, delta, mousePosition, flockCentre, flock) {
 }
 
 function update (state, delta, mousePosition) {
+  state.mousePosition = mousePosition;
+
   const flockCentre = calculateFlockCentre(state.flock);
 
   state.flock.forEach(boid => updateBoid(
@@ -167,7 +190,8 @@ function update (state, delta, mousePosition) {
 
 function main ({DOM, Time, Mouse}) {
   const initialState = {
-    flock: makeflock(BOID_COUNT)
+    flock: makeflock(BOID_COUNT),
+    mousePosition: {x: 0, y: 0}
   };
 
   const tick$ = Time.map(time => time.delta / FRAME_RATE);
