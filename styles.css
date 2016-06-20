@@ -1,0 +1,7 @@
+.boid {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 12.5px 0 12.5px 30px;
+  border-color: transparent transparent transparent #9900ff;
+}
