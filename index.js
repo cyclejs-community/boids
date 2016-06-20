@@ -14,6 +14,18 @@ import mousePositionDriver from './src/mouse-position-driver';
 //    X each boid moves towards the centre of the flock
 //    X each boid moves towards the mouse
 //
+//
+//  bonus:
+//    - deploy
+//    - start mouse in center
+//    - sliders
+//    - colors
+//      - more colourful closer to mouse
+//      - random hue
+//
+//    - min/max speed
+//    - glow
+//    - add/remove boid button
 const FRAME_RATE = 1000 / 60;
 
 const AVOIDANCE_DISTANCE = 50;
