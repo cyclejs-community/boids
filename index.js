@@ -21,7 +21,10 @@ const LIGHTNESS_MAX = 100;
 const LIGHTNESS_RANGE = LIGHTNESS_MAX - LIGHTNESS_MIN;
 const LIGHTNESS_FALLOFF = 800;
 
-const BOID_COUNT = 75;
+const SCALE_MIN = 0.05;
+const SCALE_FACTOR = 30;
+
+const BOID_COUNT = 200;
 const FRICTION = 0.98;
 
 function Boid () {
@@ -42,7 +45,7 @@ function renderBoid (boid, mousePosition) {
 
   const speed = Math.abs(boid.velocity.x) + Math.abs(boid.velocity.y);
 
-  const scale = speed / 30;
+  const scale = SCALE_MIN + speed / SCALE_FACTOR;
 
   const distanceVector = {
     x: Math.abs(boid.position.x - mousePosition.x),
@@ -147,7 +150,9 @@ function moveAwayFromCloseBoids (boid, flock, avoidance, avoidanceDistance, delt
     );
 
     if (distance < avoidanceDistance) {
-      moveTowards(boid, delta, otherBoid.position, -avoidance);
+      const distanceRatio = 1 - distance / avoidanceDistance;
+
+      moveTowards(boid, delta, otherBoid.position, -avoidance * distanceRatio);
     }
   });
 }
