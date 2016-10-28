@@ -37,12 +37,12 @@ function makeflock (count) {
   return _.range(count).map(Boid);
 }
 
-function renderBoid (boid, mousePosition) {
+function renderBoid (boid, mousePosition, delta) {
   const angle = Math.atan2(boid.velocity.y, boid.velocity.x);
 
   const speed = Math.abs(boid.velocity.x) + Math.abs(boid.velocity.y);
 
-  const scale = speed / 30;
+  const scale = speed / 30 * delta;
 
   const distanceVector = {
     x: Math.abs(boid.position.x - mousePosition.x),
@@ -80,7 +80,7 @@ function view (state) {
         slider('.flock-centre', state.weights.flockCentre)
       ]),
 
-      div('.boids', state.flock.map(boid => renderBoid(boid, state.mousePosition)))
+      div('.boids', state.flock.map(boid => renderBoid(boid, state.mousePosition, state.delta)))
     ])
   );
 }
@@ -196,6 +196,7 @@ function updateBoid (boid, delta, mousePosition, flockCentre, flock, weights) {
 
 function update (state, delta, mousePosition) {
   state.mousePosition = mousePosition;
+  state.delta = delta;
 
   const flockCentre = calculateFlockCentre(state.flock);
 
@@ -215,6 +216,7 @@ function main ({DOM, Time, Mouse}) {
   const initialState = {
     flock: makeflock(BOID_COUNT),
     mousePosition: {x: 0, y: 0},
+    delta: 1,
 
     weights: {
       avoidance: {value: 110, min: 50, max: 150},
